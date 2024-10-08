@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tableau de Bord Crypto des potes</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-gray-900 text-white transition duration-300">
+  <div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold text-center mb-6">Tableau de Bord du Marché Crypto des potes</h1>
+    <div class="overflow-x-auto">
+      <table class="min-w-full bg-gray-800 border border-gray-700 shadow-md rounded-lg">
+        <thead>
+          <tr class="bg-gray-700 text-gray-300 uppercase text-sm">
+            <th class="p-4 border-b"></th>
+            <th class="p-4 border-b">Cryptomonnaie</th>
+            <th class="p-4 border-b">Prix (ETH/SOL)</th>
+            <th class="p-4 border-b">Capitalisation Boursière</th>
+            <th class="p-4 border-b">Date</th>
+            <th class="p-4 border-b"></th>
+          </tr>
+        </thead>
+        <tbody id="crypto-table-body">
+          <tr class="hover:bg-gray-600 text-center">
+            <td class="p-4 border-b">
+              <img src="${row.picture}" alt="${row.cryptocurrency} logo" class="w-8 h-8 rounded">
+            </td>
+            <td class="p-4 border-b">${row.cryptocurrency}</td>
+            <td class="p-4 border-b">${row.price}</td>
+            <td class="p-4 border-b">${row.marketCap}</td>
+            <td class="p-4 border-b">${row.timestamp}</td>
+            <td class="p-4 border-b">
+              <a href="${row.link}" target="_blank" class="text-blue-600 hover:underline">Voir</a>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="pagination" class="flex justify-center mt-4"></div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script type="module">
+    let combinedData = [];
+    const rowsPerPage = 10; // Nombre de lignes par page
+    let currentPage = 1; // Page actuelle
+
+    function loadCSV(file, callback) {
+      Papa.parse(file, {
+        download: true,
+        header: false,
+        complete: function (results) {
+          callback(results.data);
+        }
+      });
+    }
+
+    function loadData() {
+      fetch('/data')
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Network response was not ok');
+          }
+          return response.json();
+        })
+        .then(data => {
+          combinedData = data.cryptoData.map(cryptoRow => {
+            const timestamp = cryptoRow.timestamp;
+            const marketCapRow = data.marketCapData.find(m => m.timestamp === timestamp);
+            return {
+              timestamp: new Date(timestamp).toLocaleString(),
+              cryptocurrency: cryptoRow.cryptocurrency,
+              market: cryptoRow.market,
+              link: cryptoRow.link,
+              price: parseFloat(cryptoRow.price).toFixed(10),
+              marketCap: marketCapRow ? marketCapRow?.marketCap?.toLocaleString('en-US', { style: 'currency', currency: 'USD' }) : 'N/A',
+              picture: cryptoRow.picture
+            };
+          });
+
+          renderTable(combinedData);
+        })
+        .catch(error => console.error('Error fetching data:', error));
+    }
+
+    function renderTable(data) {
+      const tableBody = document.getElementById('crypto-table-body');
+      tableBody.innerHTML = '';
+
+      // Calculer les lignes à afficher pour la page actuelle
+      const startIndex = (currentPage - 1) * rowsPerPage;
+      const endIndex = startIndex + rowsPerPage;
+      const paginatedData = data.slice(startIndex, endIndex);
+
+      paginatedData.forEach(row => {
+        const tableRow = document.createElement('tr');
+        tableRow.classList.add('hover:bg-gray-600');
+        tableRow.innerHTML = `
+          <td class="p-4 border-b">
+            <img src="${row.picture}" alt="${row.cryptocurrency} logo" class="w-8 h-8 rounded"> 
+          </td>
+          <td class="p-4 border-b">${row.cryptocurrency}</td>
+          <td class="p-4 border-b">${row.price}</td>
+          <td class="p-4 border-b">${row.marketCap}</td>
+          <td class="p-4 border-b">${row.timestamp}</td>
+          <td class="p-4 border-b">
+            <a href="${row.link}" target="_blank" class="text-blue-600 hover:underline">Voir</a>
+          </td>
+        `;
+        tableBody.appendChild(tableRow);
+      });
+
+      // Afficher les contrôles de pagination
+      updatePaginationControls(data.length);
+    }
+
+    function updatePaginationControls(totalRows) {
+      const paginationContainer = document.getElementById('pagination');
+      paginationContainer.innerHTML = '';
+
+      const totalPages = Math.ceil(totalRows / rowsPerPage);
+
+      for (let i = 1; i <= totalPages; i++) {
+        const pageButton = document.createElement('button');
+        pageButton.innerText = i;
+        pageButton.className = 'mx-1 p-2 bg-gray-700 text-white rounded';
+        pageButton.onclick = () => {
+          currentPage = i;
+          renderTable(combinedData); // Rendre le tableau avec la page actuelle
+        };
+        paginationContainer.appendChild(pageButton);
+      }
+    }
+
+    window.onload = loadData;
+  </script>
+</body>
+
+</html>
